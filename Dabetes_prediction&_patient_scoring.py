@@ -1,146 +1,114 @@
+import streamlit as st
 import pandas as pd
-import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-from sklearn.model_selection import GridSearchCV
-
-# Load dataset
-url = "https://raw.githubusercontent.com/jbrownlee/Datasets/master/pima-indians-diabetes.data.csv"
-column_names = ['pregnancies', 'glucose', 'blood_pressure', 'skin_thickness', 'insulin', 
-                'bmi', 'diabetes_pedigree_function', 'age', 'outcome']
-df = pd.read_csv(url, names=column_names)
-
-# Create dummy data columns
-dummy_data = {
-    "Medical History": ["Diabetes", "Hypertension", "Healthy", "Asthma", "Diabetes"] * 20,
-    "Outstandings": ["Test A, Test B", "Test C", "Test D", "Test E", "Test F"] * 20,
-    "Cash/Receipts": np.random.randint(100, 1000, size=100),
-    "System Admin": ["Admin1", "Admin2", "Admin3", "Admin4", "Admin5"] * 20,
-    "Received Time": pd.date_range('2025-01-01', periods=100, freq='H'),
-    "Region": ["Nampula", "Maputo", "Beira", "Nacala", "Pemba"] * 20,
-    "Id Number": np.random.randint(100000, 999999, size=100),
-    "Doctor Name": ["Dr. Smith", "Dr. Johnson", "Dr. Lee", "Dr. Brown", "Dr. Green"] * 20,
-    "Doctor Number": np.random.randint(100000000, 999999999, size=100),
-    "Practice Number": np.random.randint(1000, 5000, size=100),
-    "Patient Name": [f"Patient {i}" for i in range(1, 101)],
-    "Tests": ["Blood Test", "X-ray", "ECG", "MRI", "Ultrasound"] * 20,
-    "Profiles": ["Profile 1", "Profile 2", "Profile 3", "Profile 4", "Profile 5"] * 20
-}
-
-# Convert the dummy data to DataFrame
-dummy_df = pd.DataFrame(dummy_data)
-
-# Join the dummy data with the main dataframe
-df = pd.concat([df, dummy_df], axis=1)
-
-# Show first few rows
-print(df.head())
-
-# Basic info and missing value check
-print(df.info())
-print(df.describe())
-
-# Features and target
-X = df.drop('outcome', axis=1)
-y = df['outcome']
-
-# Split into train and test sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# Initialize Random Forest Classifier
-model = RandomForestClassifier(n_estimators=100, random_state=42)
-
-# Train the model
-model.fit(X_train, y_train)
-
-# Predict on test data
-y_pred = model.predict(X_test)
-
-# Evaluate the model
-accuracy = accuracy_score(y_test, y_pred)
-print(f"Accuracy: {accuracy:.4f}")
-print("Classification Report:")
-print(classification_report(y_test, y_pred))
-print("Confusion Matrix:")
-print(confusion_matrix(y_test, y_pred))
-
-# GridSearchCV for hyperparameter tuning
-param_grid = {
-    'n_estimators': [50, 100, 200],
-    'max_depth': [None, 10, 20, 30],
-    'min_samples_split': [2, 5, 10],
-    'min_samples_leaf': [1, 2, 4],
-    'class_weight': [None, 'balanced']
-}
-
-# Initialize RandomForestClassifier
-rf = RandomForestClassifier(random_state=42)
-
-# GridSearch with 5-fold cross-validation
-grid_search = GridSearchCV(estimator=rf, param_grid=param_grid, cv=5, scoring='recall', n_jobs=-1, verbose=2)
-
-# Fit GridSearch to training data
-grid_search.fit(X_train, y_train)
-
-# Best parameters found
-print("Best parameters:", grid_search.best_params_)
-
-# Best model
-best_rf = grid_search.best_estimator_
-
-# Predict and evaluate with best model
-y_pred_best = best_rf.predict(X_test)
-
-print(f"Accuracy: {accuracy_score(y_test, y_pred_best):.4f}")
-print("Classification Report:")
-print(classification_report(y_test, y_pred_best))
-print("Confusion Matrix:")
-print(confusion_matrix(y_test, y_pred_best))
-
-# Assuming original full data
-X_full = df.drop('outcome', axis=1)
-y_full = df['outcome']
-
-# Split full data into train_val (80%) and test (20%) sets
-X_train_val, X_test, y_train_val, y_test = train_test_split(X_full, y_full, test_size=0.2, random_state=42, stratify=y_full)
-
-# Further split train_val into training and validation sets (e.g., 75/25 split)
-X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.25, random_state=42, stratify=y_train_val)
-
-# Now train your best model on X_train and y_train
-best_rf.fit(X_train, y_train)
-
-# Evaluate on validation set
-y_val_pred = best_rf.predict(X_val)
-print("Validation set performance:")
-print(classification_report(y_val, y_val_pred))
-
-# Evaluate on the test set (unseen data)
-y_test_pred = best_rf.predict(X_test)
-print(f"Test set performance:")
-print(f"Accuracy: {accuracy_score(y_test, y_test_pred):.4f}")
-print("Classification Report:")
-print(classification_report(y_test, y_test_pred))
-print("Confusion Matrix:")
-print(confusion_matrix(y_test, y_test_pred))
-
-# Results with actual and predicted values
-results_df = pd.DataFrame({
-    'Actual': y_test,
-    'Predicted': y_test_pred
-})
-
-# Filter to only include positive class (1)
-positive_cases_df = results_df[results_df['Actual'] == 1]
-
-# Display first few rows of positive cases
-print(positive_cases_df.head())
-
-# Save results to CSV
-positive_cases_df.to_csv('positive_cases_predictions.csv', index=False)
-
-# Additional functionality to predict on new data, filter by age group, and visualize predictions
+import altair as alt
 import joblib
-joblib.dump(best_rf, 'diabetes_model.pkl')
-print("Best model saved to diabetes_model.pkl")
+
+# Cache loading base dataset
+@st.cache_data
+def load_base_data():
+    return pd.read_csv('full_patient_predictions.csv')
+
+# Cache loading trained model
+@st.cache_resource
+def load_model():
+    return joblib.load('diabetes_model.pkl')
+
+# Load base data and model
+df = load_base_data()
+model = load_model()
+
+st.title("Fastlane Patient Risk Dashboard")
+
+# Sidebar: Upload new patient data CSV
+uploaded_file = st.sidebar.file_uploader("Upload New Patient Data (CSV)", type=["csv"])
+
+if uploaded_file:
+    new_data = pd.read_csv(uploaded_file)
+
+    # Predict on new data
+    new_data['Predicted'] = model.predict(new_data)
+    probs = model.predict_proba(new_data)
+    new_data['Prob_No_Diabetes'] = probs[:, 0]
+    new_data['Prob_Diabetes'] = probs[:, 1]
+
+    # Risk Flag logic
+    def risk_flag(row):
+        if row['Predicted'] == 1 or row['Prob_No_Diabetes'] < 0.2:
+            return 'High Risk'
+        else:
+            return 'Low Risk'
+
+    new_data['Risk_Flag'] = new_data.apply(risk_flag, axis=1)
+
+    # Override base df with new uploaded data
+    df = new_data
+    st.sidebar.success("New patient data loaded and predictions applied.")
+
+# Create age group bins for filtering
+age_bins = [20,30,40,50,60,70,80,90]
+age_labels = [f"{age_bins[i]}-{age_bins[i+1]-1}" for i in range(len(age_bins)-1)]
+df['age_group'] = pd.cut(df['age'], bins=age_bins, labels=age_labels, right=False).astype(str)
+
+# Sidebar filters for Age Group and Risk Level
+age_group_options = df['age_group'].dropna().unique().tolist()
+selected_age_groups = st.sidebar.multiselect("Filter by Age Group", age_group_options, default=age_group_options)
+
+risk_options = df['Risk_Flag'].dropna().unique().tolist()
+selected_risk_levels = st.sidebar.multiselect("Filter by Risk Level", risk_options, default=risk_options)
+
+# Sidebar filters for Region, ID Number, Practice Number, and Patient Name
+region_options = df['Region'].dropna().unique().tolist()
+selected_region = st.sidebar.multiselect("Filter by Region", region_options, default=region_options)
+
+id_number_options = df['Id Number'].dropna().unique().tolist()
+selected_id_number = st.sidebar.multiselect("Filter by Id Number", id_number_options, default=id_number_options)
+
+practice_number_options = df['Practice Number'].dropna().unique().tolist()
+selected_practice_number = st.sidebar.multiselect("Filter by Practice Number", practice_number_options, default=practice_number_options)
+
+patient_name_options = df['Patient Name'].dropna().unique().tolist()
+selected_patient_name = st.sidebar.multiselect("Filter by Patient Name", patient_name_options, default=patient_name_options)
+
+# Filter dataframe based on sidebar selections
+filtered_df = df[
+    (df['age_group'].isin(selected_age_groups)) &
+    (df['Risk_Flag'].isin(selected_risk_levels)) &
+    (df['Region'].isin(selected_region)) &
+    (df['Id Number'].isin(selected_id_number)) &
+    (df['Practice Number'].isin(selected_practice_number)) &
+    (df['Patient Name'].isin(selected_patient_name))
+]
+
+st.markdown(f"### Displaying {len(filtered_df)} patients")
+st.dataframe(filtered_df, use_container_width=True)
+
+# Visualizations
+risk_chart = alt.Chart(filtered_df).mark_bar().encode(
+    x='Risk_Flag:N',
+    y='count()'
+).properties(title='Risk Level Distribution')
+st.altair_chart(risk_chart, use_container_width=True)
+
+# Outcome Distribution Chart (show only if column exists)
+if 'outcome' in filtered_df.columns:
+    outcome_chart = alt.Chart(filtered_df).mark_bar().encode(
+        x='outcome:N',
+        y='count()'
+    ).properties(title='Outcome Distribution')
+    st.altair_chart(outcome_chart, use_container_width=True)
+
+# Predicted Class Distribution Chart
+predicted_chart = alt.Chart(filtered_df).mark_bar().encode(
+    x='Predicted:N',
+    y='count()'
+).properties(title='Predicted Class Distribution')
+st.altair_chart(predicted_chart, use_container_width=True)
+
+# Download filtered data as CSV
+csv = filtered_df.to_csv(index=False)
+st.download_button(
+    label='Download Filtered Results as CSV',
+    data=csv,
+    file_name='filtered_patients.csv',
+    mime='text/csv'
+)
