@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 import joblib
+from sklearn.ensemble import RandomForestClassifier
 
 # Cache loading base dataset
 @st.cache_data
@@ -12,6 +13,14 @@ def load_base_data():
 @st.cache_resource
 def load_model():
     return joblib.load('diabetes_model.pkl')
+
+# Save the model
+def save_model(model, model_path='models/diabetes_model.pkl'):
+    joblib.dump(model, model_path)
+
+# Save the new patient data with predictions
+def save_data(df, data_path='data/full_patient_predictions.csv'):
+    df.to_csv(data_path, index=False)
 
 # Load base data and model
 df = load_base_data()
@@ -43,6 +52,10 @@ if uploaded_file:
     # Override base df with new uploaded data
     df = new_data
     st.sidebar.success("New patient data loaded and predictions applied.")
+
+    # Save the new patient data and model
+    save_data(df)  # Save the updated data with predictions
+    save_model(model)  # Save the model (optional, if retrained)
 
 # Create age group bins for filtering
 age_bins = [20,30,40,50,60,70,80,90]
