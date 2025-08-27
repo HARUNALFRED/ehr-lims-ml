@@ -6,12 +6,12 @@ import joblib
 # Cache loading base dataset
 @st.cache_data
 def load_base_data():
-    return pd.read_csv('data/full_patient_predictions.csv')
+    return pd.read_csv('data/full_patient_predictions.csv')  # Make sure this path is correct
 
 # Cache loading trained model
 @st.cache_resource
 def load_model():
-    return joblib.load('models/diabetes_model.pkl')
+    return joblib.load('models/diabetes_model.pkl')  # Make sure this path is correct
 
 # Load base data and model
 df = load_base_data()
@@ -56,17 +56,33 @@ selected_age_groups = st.sidebar.multiselect("Filter by Age Group", age_group_op
 risk_options = df['Risk_Flag'].dropna().unique().tolist()
 selected_risk_levels = st.sidebar.multiselect("Filter by Risk Level", risk_options, default=risk_options)
 
+# Adding filters for other columns (e.g., Region, Id Number, Practice Number, Patient Name)
+region_options = df['Region'].dropna().unique().tolist()
+selected_region = st.sidebar.multiselect("Filter by Region", region_options, default=region_options)
+
+id_number_options = df['Id Number'].dropna().unique().tolist()
+selected_id_number = st.sidebar.multiselect("Filter by Id Number", id_number_options, default=id_number_options)
+
+practice_number_options = df['Practice Number'].dropna().unique().tolist()
+selected_practice_number = st.sidebar.multiselect("Filter by Practice Number", practice_number_options, default=practice_number_options)
+
+patient_name_options = df['Patient Name'].dropna().unique().tolist()
+selected_patient_names = st.sidebar.multiselect("Filter by Patient Name", patient_name_options, default=patient_name_options)
+
 # Filter dataframe based on selections
 filtered_df = df[
     (df['age_group'].isin(selected_age_groups)) &
-    (df['Risk_Flag'].isin(selected_risk_levels))
+    (df['Risk_Flag'].isin(selected_risk_levels)) &
+    (df['Region'].isin(selected_region)) &
+    (df['Id Number'].isin(selected_id_number)) &
+    (df['Practice Number'].isin(selected_practice_number)) &
+    (df['Patient Name'].isin(selected_patient_names))
 ]
 
 st.markdown(f"### Displaying {len(filtered_df)} patients")
 st.dataframe(filtered_df, use_container_width=True)
 
 # Charts
-
 risk_chart = alt.Chart(filtered_df).mark_bar().encode(
     x='Risk_Flag:N',
     y='count()'
